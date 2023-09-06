@@ -102,12 +102,24 @@ resource "helm_release" "linkerd-viz" {
   version = "30.11.0"
 }
 
+# Add automatic proxy injection to default namespace.
+resource "null_resource" "inject_linkerd_proxy_in_default_namespace" {
+  depends_on = [helm_release.linkerd-control-plane]
+
+  provisioner "local-exec" {
+    command = "kubectl annotate --overwrite namespace default linkerd.io/inject=enabled"
+  }
+}
+
 # Create the namespace for emissary
 resource "kubernetes_namespace" "emissary" {
   depends_on = [null_resource.kubeconfig]
 
   metadata {
     name = "emissary"
+    annotations = {
+      "linkerd.io/inject": "enabled"
+    }
   }
 }
 
@@ -117,6 +129,9 @@ resource "kubernetes_namespace" "emissary-system" {
 
   metadata {
     name = "emissary-system"
+    annotations = {
+      "linkerd.io/inject": "enabled"
+    }
   }
 }
 
