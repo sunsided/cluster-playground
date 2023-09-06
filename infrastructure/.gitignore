@@ -1,0 +1,11 @@
+
+# Terraform files
+*.tfplan
+.terraform/
+.terraform*
+*.tfstate
+*.backup
+
+# Certificate files
+*.crt
+*.key

@@ -1,0 +1,4 @@
+# .NET specifics
+**/bin/
+**/obj/
+*.user
