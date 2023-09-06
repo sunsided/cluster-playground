@@ -6,6 +6,7 @@
 - Docker
 - KIND, e.g. from [kubernetes-sigs/kind](https://github.com/kubernetes-sigs/kind/releases)
 - Helm
+- step, e.g. from [Install step](https://smallstep.com/docs/step-cli/installation/)
 
 ### Installing Terraform
 

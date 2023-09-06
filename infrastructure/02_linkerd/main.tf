@@ -101,3 +101,73 @@ resource "helm_release" "linkerd-viz" {
   chart = "linkerd-viz"
   version = "30.11.0"
 }
+
+# Create the namespace for emissary
+resource "kubernetes_namespace" "emissary" {
+  depends_on = [null_resource.kubeconfig]
+
+  metadata {
+    name = "emissary"
+  }
+}
+
+# Create the namespace for the emissary system
+resource "kubernetes_namespace" "emissary-system" {
+  depends_on = [null_resource.kubeconfig]
+
+  metadata {
+    name = "emissary-system"
+  }
+}
+
+# Install Emissary CRDs
+# See https://www.getambassador.io/docs/emissary/latest/topics/install/helm
+resource "null_resource" "emissary-crds" {
+  depends_on = [kubernetes_namespace.emissary-system]
+
+  provisioner "local-exec" {
+    command = "kubectl apply -f https://app.getambassador.io/yaml/emissary/3.8.0/emissary-crds.yaml"
+  }
+}
+
+# Wait for emissary-apiext to be deployed
+# See https://www.getambassador.io/docs/emissary/latest/topics/install/helm
+resource "null_resource" "emissary-apiext" {
+  depends_on = [null_resource.emissary-crds]
+
+  provisioner "local-exec" {
+    command = "kubectl wait --timeout=600s --for=condition=available deployment emissary-apiext -n emissary-system"
+  }
+}
+
+# Deploy Emissary Ingress (previously Ambassador)
+#
+# See also:
+# - https://linkerd.io/2.14/tasks/using-ingress/#ambassador
+# - https://buoyant.io/blog/emissary-and-linkerd-the-best-of-both-worlds
+resource "helm_release" "emissary" {
+  depends_on = [
+    null_resource.emissary-apiext,
+    kubernetes_namespace.emissary,
+    helm_release.linkerd-control-plane
+  ]
+
+  name = "emissary-ingress"
+  namespace = "emissary"
+
+  repository = "https://www.getambassador.io"
+  chart = "emissary-ingress"
+  version = "8.8.0"
+
+  set {
+    name  = "replicaCount"
+    value = "1"
+  }
+
+  set {
+    name  = "service.type"
+    value = "ClusterIP"
+  }
+
+  wait = true
+}
