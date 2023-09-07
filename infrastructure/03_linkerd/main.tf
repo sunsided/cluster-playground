@@ -115,42 +115,6 @@ resource "kubernetes_manifest" "linkerd-identity-trust-roots" {
   }
 }
 
-# Create the CA certificates
-resource "null_resource" "generate-ca-cert" {
-  provisioner "local-exec" {
-    command = "step certificate create root.linkerd.cluster.local ca.crt ca.key --profile root-ca --no-password --insecure"
-  }
-}
-
-data "local_file" "ca-certificate" {
-  depends_on = [null_resource.generate-ca-cert]
-  filename = "${path.module}/ca.crt"
-}
-
-data "local_file" "ca-key" {
-  depends_on = [null_resource.generate-ca-cert]
-  filename = "${path.module}/ca.key"
-}
-
-# Create the mTLS issuer certificates
-resource "null_resource" "generate-issuer-cert" {
-  depends_on = [null_resource.generate-ca-cert]
-
-  provisioner "local-exec" {
-    command = "step certificate create identity.linkerd.cluster.local issuer.crt issuer.key --profile intermediate-ca --not-after 8760h --no-password --insecure --ca ca.crt --ca-key ca.key"
-  }
-}
-
-data "local_file" "issuer-certificate" {
-  depends_on = [null_resource.generate-issuer-cert]
-  filename = "${path.module}/issuer.crt"
-}
-
-data "local_file" "issuer-key" {
-  depends_on = [null_resource.generate-issuer-cert]
-  filename = "${path.module}/issuer.key"
-}
-
 # Deploy Linkerd Control Plane with Helm
 #
 # Will require mTLS root certificates - see https://linkerd.io/2.14/tasks/generate-certificates/
@@ -165,12 +129,6 @@ resource "helm_release" "linkerd-control-plane" {
   repository = "https://helm.linkerd.io/stable"
   chart = "linkerd-control-plane"
   version = "1.15.0"
-
-  set {
-    name  = "identityTrustAnchorsPEM"
-    value = data.local_file.ca-certificate.content
-    type = "string"
-  }
 
   set {
     name  = "identity.issuer.scheme"

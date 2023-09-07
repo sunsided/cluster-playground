@@ -20,7 +20,6 @@ See [infrastructure/04_mappings/main.tf](infrastructure/04_mappings/main.tf) for
 - Docker
 - KIND, e.g. from [kubernetes-sigs/kind](https://github.com/kubernetes-sigs/kind/releases)
 - Helm
-- step, e.g. from [Install step](https://smallstep.com/docs/step-cli/installation/)
 
 ### Installing Terraform
 
