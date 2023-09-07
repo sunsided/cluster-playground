@@ -74,3 +74,39 @@ resource "null_resource" "emissary-apiext" {
     command = "kubectl wait --timeout=600s --for=condition=available deployment emissary-apiext -n emissary-system"
   }
 }
+
+# Create the namespace for cert-manager
+resource "kubernetes_namespace" "cert-manager" {
+  metadata {
+    name = "cert-manager"
+    annotations = {
+      "linkerd.io/inject": "disabled"
+    }
+  }
+}
+
+# cert-manager
+module "cert-manager" {
+  depends_on = [kubernetes_namespace.cert-manager]
+  source  = "terraform-iaac/cert-manager/kubernetes"
+  version = "2.6.0"
+
+  create_namespace = false
+  cluster_issuer_email = "admin@cluster.playground"
+  cluster_issuer_create = false
+  # cluster_issuer_name                    = "cert-manager-global"
+  # cluster_issuer_private_key_secret_name = "cert-manager-private-key"
+}
+
+resource "helm_release" "trust-manager" {
+  depends_on = [module.cert-manager]
+
+  name = "trust-manager"
+  namespace = "cert-manager"
+
+  repository = "https://charts.jetstack.io"
+  chart = "trust-manager"
+  version = "0.6.0"
+
+  wait = true
+}
