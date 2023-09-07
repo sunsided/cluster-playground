@@ -20,6 +20,24 @@ resource "kind_cluster" "cluster-playground" {
 
     node {
       role = "control-plane"
+      kubeadm_config_patches = [
+        <<EOT
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+        EOT
+      ]
+      extra_port_mappings {
+        host_port = 38080
+        container_port = 8080 # Emissary
+        protocol = "TCP"
+      }
+      extra_port_mappings {
+        host_port = 38443
+        container_port = 8443 # Emissary
+        protocol = "TCP"
+      }
     }
 
     node {

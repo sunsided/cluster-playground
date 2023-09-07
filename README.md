@@ -38,11 +38,29 @@ terraform plan -out kind.tfplan
 TF_LOG=info terraform apply kind.tfplan
 ```
 
-Next, provision linkerd:
+Next, provision namespaces and CRDs:
 
 ```shell
-cd infastructure/02_linkerd
+cd infastructure/02_crds
+terraform init
+terraform plan -out crds.tfplan
+TF_LOG=info terraform apply crds.tfplan
+```
+
+Next, provision linkerd, Emissary, etc.:
+
+```shell
+cd infastructure/03_linkerd
 terraform init
 terraform plan -out linkerd.tfplan
 TF_LOG=info terraform apply linkerd.tfplan
+```
+
+Finally, provision service mappings for Emissary:
+
+```shell
+cd infastructure/04_mappings
+terraform init
+terraform plan -out mappings.tfplan
+TF_LOG=info terraform apply mappings.tfplan
 ```

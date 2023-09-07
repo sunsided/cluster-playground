@@ -1,10 +1,3 @@
-# Define a null_resource to configure Kubeconfig
-resource "null_resource" "kubeconfig" {
-  provisioner "local-exec" {
-    command = "kubectl cluster-info --context kind-cluster-playground"
-  }
-}
-
 # Create the CA certificates
 resource "null_resource" "generate-ca-cert" {
   provisioner "local-exec" {
@@ -36,33 +29,11 @@ data "local_file" "issuer-key" {
   filename = "${path.module}/issuer.key"
 }
 
-# Create the linkerd namespace
-resource "kubernetes_namespace" "linkerd" {
-  depends_on = [null_resource.kubeconfig]
-
-  metadata {
-    name = "linkerd"
-  }
-}
-
-# Deploy Linkerd CRDs with Helm
-resource "helm_release" "linkerd-crds" {
-  name = "linkerd-crds"
-  namespace = "linkerd"
-
-  repository = "https://helm.linkerd.io/stable"
-  chart = "linkerd-crds"
-  version = "1.8.0"
-}
-
 # Deploy Linkerd Control Plane with Helm
 #
 # Will require mTLS root certificates - see https://linkerd.io/2.14/tasks/generate-certificates/
 resource "helm_release" "linkerd-control-plane" {
-  depends_on = [
-    helm_release.linkerd-crds,
-    null_resource.generate-issuer-cert
-  ]
+  depends_on = [null_resource.generate-issuer-cert]
 
   name = "linkerd-control-plane"
   namespace = "linkerd"
@@ -111,61 +82,13 @@ resource "null_resource" "inject_linkerd_proxy_in_default_namespace" {
   }
 }
 
-# Create the namespace for emissary
-resource "kubernetes_namespace" "emissary" {
-  depends_on = [null_resource.kubeconfig]
-
-  metadata {
-    name = "emissary"
-    annotations = {
-      "linkerd.io/inject": "enabled"
-    }
-  }
-}
-
-# Create the namespace for the emissary system
-resource "kubernetes_namespace" "emissary-system" {
-  depends_on = [null_resource.kubeconfig]
-
-  metadata {
-    name = "emissary-system"
-    annotations = {
-      "linkerd.io/inject": "enabled"
-    }
-  }
-}
-
-# Install Emissary CRDs
-# See https://www.getambassador.io/docs/emissary/latest/topics/install/helm
-resource "null_resource" "emissary-crds" {
-  depends_on = [kubernetes_namespace.emissary-system]
-
-  provisioner "local-exec" {
-    command = "kubectl apply -f https://app.getambassador.io/yaml/emissary/3.8.0/emissary-crds.yaml"
-  }
-}
-
-# Wait for emissary-apiext to be deployed
-# See https://www.getambassador.io/docs/emissary/latest/topics/install/helm
-resource "null_resource" "emissary-apiext" {
-  depends_on = [null_resource.emissary-crds]
-
-  provisioner "local-exec" {
-    command = "kubectl wait --timeout=600s --for=condition=available deployment emissary-apiext -n emissary-system"
-  }
-}
-
 # Deploy Emissary Ingress (previously Ambassador)
 #
 # See also:
 # - https://linkerd.io/2.14/tasks/using-ingress/#ambassador
 # - https://buoyant.io/blog/emissary-and-linkerd-the-best-of-both-worlds
 resource "helm_release" "emissary" {
-  depends_on = [
-    null_resource.emissary-apiext,
-    kubernetes_namespace.emissary,
-    helm_release.linkerd-control-plane
-  ]
+  depends_on = [helm_release.linkerd-control-plane]
 
   name = "emissary-ingress"
   namespace = "emissary"
@@ -181,8 +104,35 @@ resource "helm_release" "emissary" {
 
   set {
     name  = "service.type"
-    value = "ClusterIP"
+    value = "NodePort"
   }
 
   wait = true
+}
+
+# Patch node selector for Emissary ingress
+resource "null_resource" "patch-emissary-ingress" {
+  depends_on = [helm_release.emissary]
+
+  provisioner "local-exec" {
+    command = "kubectl patch deployment -n emissary emissary-ingress --type merge --patch '{\"spec\": {\"template\": {\"spec\": {\"nodeSelector\": {\"ingress-ready\": \"true\"}, \"tolerations\": [{\"effect\":\"NoSchedule\", \"operator\":\"Exists\", \"key\":\"node-role.kubernetes.io/control-plane\"}, {\"effect\":\"NoSchedule\", \"operator\":\"Exists\", \"key\":\"node-role.kubernetes.io/master\"}]}, \"metadata\": { \"annotations\": { \"prometheus.io/scrape\": \"true\", \"prometheus.io/port\": \"9102\" } }}}}'"
+  }
+}
+
+# Create a module for Emissary itself
+resource "null_resource" "ambassador-module" {
+  depends_on = [helm_release.emissary]
+
+  provisioner "local-exec" {
+    command = "kubectl patch module -n emissary ambassador --type merge --patch '{\"spec\": {\"config\": {\"add_linkerd_headers\": true}}}'"
+  }
+}
+
+# Patch ports for Emissary
+resource "null_resource" "patch-emissary-ports" {
+  depends_on = [helm_release.emissary]
+
+  provisioner "local-exec" {
+    command = "kubectl patch deployment -n emissary emissary-ingress --type json --patch '[{\"op\":\"add\", \"path\":\"/spec/template/spec/containers/0/ports\", \"value\":[{\"containerPort\":8080,\"hostPort\":8080,\"name\":\"http\",\"protocol\":\"TCP\"},{\"containerPort\":8443,\"hostPort\":8443,\"name\":\"https\",\"protocol\":\"TCP\"},{\"containerPort\":8877,\"name\":\"admin\",\"protocol\":\"TCP\"}]}]'"
+  }
 }
