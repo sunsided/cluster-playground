@@ -107,6 +107,11 @@ resource "helm_release" "emissary" {
     value = "NodePort"
   }
 
+  set {
+    name = "createDefaultListeners"
+    value = "false"
+  }
+
   wait = true
 }
 
@@ -133,6 +138,6 @@ resource "null_resource" "patch-emissary-ports" {
   depends_on = [helm_release.emissary]
 
   provisioner "local-exec" {
-    command = "kubectl patch deployment -n emissary emissary-ingress --type json --patch '[{\"op\":\"add\", \"path\":\"/spec/template/spec/containers/0/ports\", \"value\":[{\"containerPort\":8080,\"hostPort\":8080,\"name\":\"http\",\"protocol\":\"TCP\"},{\"containerPort\":8443,\"hostPort\":8443,\"name\":\"https\",\"protocol\":\"TCP\"},{\"containerPort\":8877,\"name\":\"admin\",\"protocol\":\"TCP\"}]}]'"
+    command = "kubectl patch deployment -n emissary emissary-ingress --type json --patch '[{\"op\":\"replace\", \"path\":\"/spec/template/spec/containers/0/ports\", \"value\":[{\"containerPort\":8080,\"hostPort\":8080,\"name\":\"http\",\"protocol\":\"TCP\"},{\"containerPort\":8443,\"hostPort\":8443,\"name\":\"https\",\"protocol\":\"TCP\"},{\"containerPort\":8877,\"name\":\"admin\",\"protocol\":\"TCP\"}]}]'"
   }
 }
