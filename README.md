@@ -1,17 +1,28 @@
 # ASP.NET Core on Kubernetes (kindly terraformed)
 
 **This is a work in progress.** This project is meant to provide a starting point to experiment with
-ASP.NET Core HTTP/2 and HTTP/3 hosting on linkerd-meshed Kubernetes. Terraform files are provided
-to bootstrap a Kubernetes-in-Docker cluster, using the Emissary (formerly _Ambassador_) ingress.
+ASP.NET Core HTTP/2 and HTTP/3 hosting on [linkerd]-meshed [Kubernetes]. [Terraform] files are provided
+to bootstrap a [Kubernetes-in-Docker] cluster, using [Emissary-Ingress] (formerly _Ambassador_) ingress.
+
+Certificates are issued from a self-signed CA managed by [cert-manager] and bundled by [trust-manager]. Specifically,
+Let's Encrypt is not used as an ACME provider since no public internet access is given.
+
+[Kubernetes]: https://kubernetes.io/
+[linkerd]: https://linkerd.io/
+[Terraform]: https://www.terraform.io/
+[cert-manager]: https://cert-manager.io/
+[trust-manager]: https://cert-manager.io/docs/projects/trust-manager
+[Emissary-Ingress]: https://www.getambassador.io/products/api-gateway
+[Kubernetes-in-Docker]: https://kind.sigs.k8s.io/
 
 ---
 
 The kind setup (bootstrapped with Terraform, see below) assumes that services are reachable under the
 domain `cluster-playground` at port `38080` (HTTP) and `38443` (HTTPS). Specifically, the Linkerd dashboard
 is available at `http://linkerd.cluster-playground:38080` or `https://linkerd.cluster-playground:38443`.
-You will need to make sure that your hosts table (e.g. `/etc/hosts`) contains proper redirects to the IP of the
+You will need to make sure that your DNS contains proper redirects to the IP of the
 `cluster-playground-control-plane` Docker container, which should listen at `0.0.0.0:38080` and `0.0.0.0:38443`
-respectively.
+respectively. You may want to fiddle with your `/etc/hosts` table.
 
 See [infrastructure/04_mappings/main.tf](infrastructure/04_mappings/main.tf) for more details.
 
