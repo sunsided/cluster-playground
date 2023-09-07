@@ -1,3 +1,30 @@
+resource "kubernetes_manifest" "linkerd-trust-anchor-cert" {
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind = "Certificate"
+    metadata = {
+      name = "cluster-playground"
+      namespace = "emissary"
+    }
+    spec = {
+      secretName = "emissary-certs-cluster-playground"
+      issuerRef = {
+        name = "linkerd-self-signed-issuer"
+        kind = "ClusterIssuer"
+      }
+      commonName = "cluster.playground"
+      dnsNames = [
+        "cluster-playground",
+        "cluster.playground",
+        "linkerd.cluster-playground",
+        "linkerd.cluster.playground",
+        "*.cluster.playground",
+        "*.cluster-playground"
+      ]
+    }
+  }
+}
+
 # Create a listener for Emissary
 # See also:
 # - https://www.getambassador.io/docs/emissary/latest/topics/running/listener
@@ -69,6 +96,10 @@ resource "kubernetes_manifest" "emissary-host-catchall" {
           action = "Route"
         }
       }
+      tlsSecret = {
+        name = "emissary-certs-cluster-playground"
+        namespace = "emissary"
+      }
     }
   }
 }
@@ -117,6 +148,10 @@ resource "kubernetes_manifest" "emissary-host-linkerd-https" {
         insecure = {
           action = "Route"
         }
+      }
+      tlsSecret = {
+        name = "emissary-certs-cluster-playground"
+        namespace = "emissary"
       }
     }
   }

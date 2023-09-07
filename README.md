@@ -8,9 +8,10 @@ to bootstrap a Kubernetes-in-Docker cluster, using the Emissary (formerly _Ambas
 
 The kind setup (bootstrapped with Terraform, see below) assumes that services are reachable under the
 domain `cluster-playground` at port `38080` (HTTP) and `38443` (HTTPS). Specifically, the Linkerd dashboard
-is available at `http://linkerd.cluster-playground:38080`. You will need to make sure that your hosts table
-(e.g. `/etc/hosts`) contains proper redirects to the IP of the `cluster-playground-control-plane` Docker container,
-which should listen at `0.0.0.0:38080` and `0.0.0.0:38443` respectively.
+is available at `http://linkerd.cluster-playground:38080` or `https://linkerd.cluster-playground:38443`.
+You will need to make sure that your hosts table (e.g. `/etc/hosts`) contains proper redirects to the IP of the
+`cluster-playground-control-plane` Docker container, which should listen at `0.0.0.0:38080` and `0.0.0.0:38443`
+respectively.
 
 See [infrastructure/04_mappings/main.tf](infrastructure/04_mappings/main.tf) for more details.
 
@@ -41,6 +42,9 @@ snap install helm
 
 ## Provisioning the cluster
 
+The cluster provisioning is split into multiple steps. This is suboptimal but is currently required to decouple
+dependencies between CRDs dynamically created in one step but statically verified in another.
+
 First, create the kind cluster. This first needs to pull the [kindest/node](https://hub.docker.com/r/kindest/node/)
 Docker image, which may take some time.
 
@@ -51,7 +55,7 @@ terraform plan -out kind.tfplan
 TF_LOG=info terraform apply kind.tfplan
 ```
 
-Next, provision namespaces and CRDs:
+Next, provision namespaces and CRDs, cert-manager, trust-manager, etc.:
 
 ```shell
 cd infastructure/02_crds
@@ -69,7 +73,7 @@ terraform plan -out linkerd.tfplan
 TF_LOG=info terraform apply linkerd.tfplan
 ```
 
-Finally, provision service mappings for Emissary:
+Finally, provision service mappings for Emissary, additional certificates, etc.:
 
 ```shell
 cd infastructure/04_mappings
